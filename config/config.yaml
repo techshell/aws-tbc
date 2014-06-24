@@ -1,0 +1,228 @@
+defaults:
+  Ami: ami-xxxxxx
+  Snapshot: snap-xxxxxx
+  chef:
+    run_list:
+    - recipe[apt]
+    - recipe[apt::tmg]
+    - recipe[base]
+    - recipe[chef-solo-search]
+    - recipe[users::ops]
+    - recipe[postfix]
+  seshost:
+    preprod: "postfix"
+    prod: "postfix"
+  sesuser:
+    preprod: "postfix"
+    prod: "postfix"
+  sespass:
+    preprod: "postfix"
+    prod: "postfix"
+  environment:
+    AvailabilityZones:
+    - eu-west-1a
+    - eu-west-1b
+    HostedZone: preprod.foo.com
+    MonitoringSecurityGroup: sg-xxxxxx
+    SnsAutoScaling: arn:aws:sns:eu-west-1:xxxxxx:autoscaling-update
+    SnsCreateStack: arn:aws:sns:eu-west-1:xxxxxx:stack-creation
+    chef:
+      postfix:
+        aliases:
+        - root: websupport@foo.com
+        main:
+          relayhost: "email-smtp.eu-west-1.amazonaws.com:25"
+          sender_canonical_maps: "regexp:/etc/postfix/sender_canonical"
+          smtp_sasl_auth_enable: "yes"
+          smtp_sasl_security_options: "noanonymous"
+          smtp_sasl_password_maps: "hash:/etc/postfix/sasl_passwd"
+          smtp_use_tls: "yes"
+          smtp_tls_security_level: "encrypt"
+          smtp_tls_note_starttls_offer: "yes"
+          smtp_tls_CAfile: "/etc/ssl/certs/ca-certificates.crt"
+          smtpd_tls_CAfile: "/etc/ssl/certs/ca-certificates.crt"
+iam_policies:
+  autoscaling_full:
+    Statement:
+    - Action: autoscaling:*
+      Effect: Allow
+      Resource: '*'
+  cloudformation_full:
+    Statement:
+    - Action: cloudformation:*
+      Effect: Allow
+      Resource: '*'
+  cloudwatch_full:
+    Statement:
+    - Action: cloudwatch:*
+      Effect: Allow
+      Resource: '*'
+  cloudwatch_read:
+    Statement:
+    - Action:
+      - cloudwatch:Get*
+      - cloudwatch:List*
+      Effect: Allow
+      Resource: '*'
+  describeec2:
+    Statement:
+    - Action: EC2:Describe*
+      Effect: Allow
+      Resource: '*'
+  describestacks:
+    Statement:
+    - Action: cloudformation:DescribeStacks
+      Effect: Allow
+      Resource: '*'
+  ec2_create_and_terminate:
+    Statement:
+    - Action:
+      - ec2:RunInstances
+      - ec2:StartInstances
+      - ec2:StopInstances
+      - ec2:TerminateInstances
+      - ec2:CreateTags
+      - ec2:DeleteTags
+      - ec2:CreateSecurityGroup
+      - ec2:CreateKeyPair*
+      - ec2:AuthorizeSecurityGroupIngress
+      - ec2:Describe*
+      - ec2:DeleteSecurityGroup
+      - ec2:RevokeSecurityGroupIngress
+      Effect: Allow
+      Resource: '*'
+  elasticache_full:
+    Statement:
+    - Action:
+      - elasticache:*
+      Effect: Allow
+      Resource:
+      - '*'
+  elasticloadbalancing_full:
+    Statement:
+    - Action: elasticloadbalancing:*
+      Effect: Allow
+      Resource: '*'
+  iam_for_cloudformation:
+    Statement:
+    - Action:
+      - iam:AddRoleToInstanceProfile
+      - iam:CreateInstanceProfile
+      - iam:CreateRole
+      - iam:DeleteInstanceProfile
+      - iam:DeleteRole
+      - iam:DeleteRolePolicy
+      - iam:Get*
+      - iam:PassRole
+      - iam:PutGroupPolicy
+      - iam:PutRolePolicy
+      - iam:PutUserPolicy
+      - iam:RemoveRoleFromInstanceProfile
+      Effect: Allow
+      Resource: '*'
+  nagios_read:
+    Statement:
+    - Action:
+      - s3:Get*
+      - s3:List*
+      Effect: Allow
+      Resource: arn:aws:s3:::rds-secure/nagios*
+  rds_full:
+    Statement:
+    - Action:
+      - rds:*
+      Effect: Allow
+      Resource: '*'
+  route53_full:
+    Statement:
+    - Action: route53:*
+      Effect: Allow
+      Resource: '*'
+  s3full:
+    Statement:
+    - Action:
+      - s3:*
+      Effect: Allow
+      Resource:
+      - '*'
+  attachEBS:
+    Statement:
+    - Action:
+      - ec2:AttachVolume
+      - ec2:CreateTags
+      - ec2:CreateVolume
+      Effect: Allow
+      Resource:
+      - '*'
+  s3repoAccess:
+    Statement:
+    - Action:
+      - s3:List*
+      - s3:Get*
+      Effect: Allow
+      Resource:
+      - '*'
+  s3upload:
+    Statement:
+    - Action:
+      - s3:List*
+      - s3:Put*
+      - s3:Get*
+      Effect: Allow
+      Resource:
+      - '*'
+  snsPublish:
+    Statement:
+    - Action:
+      - SNS:Publish*
+      Effect: Allow
+      Resource:
+      - '*'
+network:
+  preprod:
+    VpcId: vpc-xxxxxx
+    app:
+      SecurityGroupIds: sg-xxxxxx
+      SubnetEuWest1a: subnet-xxxxxx
+      SubnetEuWest1aCidr: 10.18.151.0/24
+      SubnetEuWest1b: subnet-xxxxxx
+      SubnetEuWest1bCidr: 10.18.152.0/24
+      SubnetEuWest1c: subnet-xxxxxx
+      SubnetEuWest1cCidr: 10.18.153.0/24
+      VpcId: vpc-xxxxxx
+    be:
+      SecurityGroupIds: sg-xxxxxx
+      SubnetEuWest1a: subnet-xxxxxx
+      SubnetEuWest1aCidr: 10.18.181.0/24
+      SubnetEuWest1b: subnet-ad2c79eb
+      SubnetEuWest1bCidr: 10.18.182.0/24
+      SubnetEuWest1c: subnet-6bb6bf09
+      SubnetEuWest1cCidr: 10.18.183.0/24
+      VpcId: vpc-xxxxxx
+    dat:
+      SecurityGroupIds: sg-xxxxxx
+      SubnetEuWest1a: subnet-xxxxxx
+      SubnetEuWest1aCidr: 10.18.171.0/24
+      SubnetEuWest1b: subnet-xxxxxx
+      SubnetEuWest1bCidr: 10.18.172.0/24
+      SubnetEuWest1c: subnet-xxxxxx
+      SubnetEuWest1cCidr: 10.18.173.0/24
+      VpcId: vpc-xxxxxx
+    db:
+      SecurityGroupIds: sg-xxxxxx
+      SubnetEuWest1a: subnet-xxxxxx
+      SubnetEuWest1aCidr: 10.18.191.0/24
+      SubnetEuWest1b: subnet-xxxxxx
+      SubnetEuWest1bCidr: 10.18.192.0/24
+      SubnetEuWest1c: subnet-xxxxxx
+      SubnetEuWest1cCidr: 10.18.193.0/24
+      VpcId: vpc-xxxxxx
+    pub:
+      SecurityGroupIds: sg-xxxxxx
+      SubnetEuWest1a: subnet-xxxxxx
+      SubnetEuWest1aCidr: 10.18.101.0/24
+      SubnetEuWest1b: subnet-xxxxxx
+      SubnetEuWest1bCidr: 10.18.102.0/24
+      SubnetEuWest1c: subnet-xxxxxx
+      SubnetEuWest1cCidr: 10.18.103.0/24
+      VpcId: vpc-xxxxxx

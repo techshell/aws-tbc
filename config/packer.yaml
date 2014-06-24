@@ -1,0 +1,50 @@
+default:
+  builders:
+  - ami_name: ubuntu_12.04_LTS_{{timestamp}}
+    instance_type: m3.large
+    region: eu-west-1
+    source_ami: ami-d1f308a6
+    ssh_username: ubuntu
+    type: amazon-ebs
+flavour:
+  blogs:
+    api:
+      ami: null
+      chef_path:
+        name: ApiServer
+        network: app
+        type: autoscaling_group
+      gitrepo: ssh://git@github.com/blog/aws.git
+      provisioners:
+      - destination: /home/ubuntu/Berksfile
+        source: blogs/config/blogs.berksfile
+        type: file
+      - destination: /home/ubuntu/node.json
+        source: blogs/config/node.json
+        type: file
+      - destination: /home/ubuntu/solo.rb
+        source: blogs/config/solo.rb
+        type: file
+      - scripts:
+        - scripts/setup_packer.sh
+        type: shell
+    app:
+      ami: null
+      chef_path:
+        name: FeServer
+        network: app
+        type: autoscaling_group
+      gitrepo: ssh://git@github.com/blog/aws.git
+      provisioners:
+      - destination: /home/ubuntu/Berksfile
+        source: blogs/config/blogs.berksfile
+        type: file
+      - destination: /home/ubuntu/node.json
+        source: blogs/config/node.json
+        type: file
+      - destination: /home/ubuntu/solo.rb
+        source: blogs/config/solo.rb
+        type: file
+      - scripts:
+        - scripts/setup_packer.sh
+        type: shell

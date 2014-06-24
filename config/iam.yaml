@@ -1,0 +1,61 @@
+iam_policies:
+  "s3upload":
+   {
+    "PolicyDocument": {
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:List*",
+                    "s3:Put*",
+                    "s3:Get*"
+                ],
+                "Resource": [
+                    "*"
+                ]
+            }
+        ]
+    }
+   }
+  "describestacks":
+    {
+      "PolicyDocument": {
+            "Statement": [
+                {
+                    "Action": "cloudformation:DescribeStacks",
+                    "Effect": "Allow",
+                    "Resource": "*"
+                }
+            ]
+        }
+    }
+  "describeec2":
+    {
+      "PolicyDocument": {
+        "Statement": [
+            {
+                "Action": "EC2:Describe*",
+                "Effect": "Allow",
+                "Resource": "*"
+            }
+        ]
+    }
+    }
+  "attachEBS":
+   {
+    "PolicyDocument": {
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                 "ec2:AttachVolume",
+                 "ec2:CreateTags",
+                 "ec2:CreateVolume"
+                ],
+                "Resource": [
+                    "*"
+                ]
+            }
+        ]
+    }
+   }

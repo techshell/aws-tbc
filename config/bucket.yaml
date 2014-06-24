@@ -1,0 +1,5 @@
+env:
+  bucket:
+    principals:
+    - "arn:aws:iam::12231312xxxx:user/larssonp"
+    - "arn:aws:iam::12231312xxxx:role/instance_role"

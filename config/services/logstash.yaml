@@ -1,0 +1,233 @@
+formations:
+  dat:
+    description: "logstash"
+    ec2:
+      gluster:
+        ami: ami-xxxxxx
+        role_overrides:
+        capacity: 2
+        instance_type: "m3.medium"
+        chef:
+          "glusterfs": {
+              "server": {
+                  "mount_directory": "/srv",
+                  "volume": "blogs"
+              }
+          }
+          "run_list": [
+            "recipe[users::build]",
+            "recipe[nfs::server]",
+            "recipe[nfs::blogs]"
+          ]
+        userdata_mounts:
+          - [ /dev/mapper/lvm_vg-lvm_partition, /srv, "auto", "defaults,nobootwait", "0", "0" ]
+        tags:
+          environment_tags:
+            prod:
+              Role: "Gluster Instance"
+              Backup: "00 02 * * * * H - 28"
+            preprod:
+              Role: "Gluster Instance"
+              Backup: "00 02 * * * * H - 1"
+        block_device_mappings:
+          "sda1":
+            device_name: "/dev/sda1"
+            volume_size: "15"
+            delete_on_termination: true
+            snapshot_id:
+              preprod: snap-xxxxxx
+              prod: snap-xxxxxx
+          "sdm":
+            device_name: "/dev/sdm"
+            volume_size: "10"
+            snapshot_id:
+              preprod: snap-xxxxxx
+              prod: snap-xxxxxx
+            delete_on_termination: true
+        iam_policies:
+         - describestacks
+         - describeec2
+  be:
+    description: "logstash"
+    autoscaling_groups:
+      Indexer:
+        ami: ami-xxxxxx
+        minsize: 1
+        maxsize: 1
+        desired_capacity: 1
+        tags:
+          environment_tags:
+            prod:
+              name: "fe"
+              Backup: "00 02 * * * * H - 28"
+            preprod:
+              name: "fe"
+              Backup: "00 02 * * * * H - 1"
+        launchconfig:
+          name: "IndexerLaunchConfig"
+          instance_type: "m3.medium"
+          iam_policies:
+           - describestacks
+           - describeec2
+          chef:
+            "apache": {
+                "prefork": { "startservers": "5",
+                             "minspareservers": "5",
+                             "maxspareservers": "10",
+                             "serverlimit": "32",
+                             "maxclients": "32",
+                             "maxrequestsperchild": "100"
+                },
+                "default_modules": [ "alias","deflate","php5","headers","rewrite","authz_host","mime","info","status","reqtimeout","setenvif" ]
+            }
+            "run_list": [
+                "recipe[users::build]",
+                "recipe[mysql::client]",
+                "recipe[nfs]",
+                "recipe[nfs::client]",
+                "recipe[escenic::wait-for-mysql]",
+                "recipe[apache2]",
+                "recipe[apache2::blogs]",
+                "recipe[database::blogs]",
+                "recipe[wordpress::wordpress]",
+                "recipe[wordpress::blogs]",
+                "recipe[apache2::tmg_apache_logs]",
+                "recipe[newrelic::php-agent]",
+                "recipe[newrelic::server-monitor]"
+            ]
+          scaling_policies:
+            FeScaleUpPolicy:
+              scaling_adjustment: "1"
+              cooldown: "300"
+            FeScaleDownPolicy:
+              cooldown: "300"
+              scaling_adjustment: "-1"
+          alarms:
+            CPUAlarmHigh:
+              metric_name: "CPUUtilization"
+              namespace: "AWS/EC2"
+              statistic: "Average"
+              period: "60"
+              evaluation_periods: "5"
+              threshold: "80"
+              alarm_actions: "FeScaleUpPolicy"
+              comparison_operator: "GreaterThanThreshold"
+              description: "Scale-up if CPU > 80% for 5min"
+            CPUAlarmLow:
+              description: "Scale-down if CPU < 60% for 15min"
+              metric_name: "CPUUtilization"
+              namespace: "AWS/EC2"
+              statistic: "Average"
+              period: "60"
+              evaluation_periods: "15"
+              threshold: "60"
+              alarm_actions: "FeScaleDownPolicy"
+              comparison_operator: "LessThanThreshold"
+        elb:
+          elb_port: 80
+          instance_port: 80
+          protocol: "HTTP"
+          healthcheckpath: "/status-check/"
+          security_groups:
+            prod:
+            - "infra-xxxxxx"
+            preprod:
+            - "infra-xxxxxx"
+        dns:
+          FeDNSRecord:
+            name: fe
+            resource: FeServerLB
+            resource_type: DNSName
+            type: CNAME
+      ApiServer:
+        ami: ami-xxxxxx
+        app_username: "blogs"
+        minsize: 1
+        maxsize: 1
+        desired_capacity: 1
+        tags:
+          environment_tags:
+            prod:
+              name: "api"
+              Backup: "00 02 * * * * H - 28"
+            preprod:
+              name: "api"
+              Backup: "00 02 * * * * H - 1"
+        launchconfig:
+          name: "ApiLaunchConfig"
+          instance_type: "m3.medium"
+          iam_policies:
+           - describestacks
+           - describeec2
+          chef:
+            "glusterfs": {
+                "client": {
+                    "volume": "blogs",
+                    "mount_directory": "/srv"
+                }
+            }
+            "apache": {
+                "prefork": { "startservers": "5",
+                             "minspareservers": "5",
+                             "maxspareservers": "10",
+                             "serverlimit": "32",
+                             "maxclients": "32",
+                             "maxrequestsperchild": "100"
+                },
+                "default_modules": [ "alias","deflate","php5","headers","rewrite","authz_host","mime","info","status","reqtimeout","setenvif" ]
+            }
+            "newrelic": {
+                "application_monitoring": {
+                    "appname":"Blogs"
+                }
+            }
+            "run_list": [
+                "recipe[users::build]",
+                "recipe[mysql::client]",
+                "recipe[nfs]",
+                "recipe[nfs::client]",
+                "recipe[escenic::wait-for-mysql]",
+                "recipe[apache2]",
+                "recipe[apache2::blogs]",
+                "recipe[database::blogs]",
+                "recipe[wordpress::wordpress]",
+                "recipe[wordpress::blogs]",
+                "recipe[wordpress::blogs-api]",
+                "recipe[apache2::tmg_apache_logs]",
+                "recipe[newrelic::php-agent]",
+                "recipe[newrelic::server-monitor]"
+            ]
+        elb:
+          elb_port: 80
+          instance_port: 80
+          protocol: "HTTP"
+          healthcheckpath: "/status-check/"
+          security_groups:
+            prod:
+            - "infra-xxxxxx"
+            preprod:
+            - "infra-xxxxxx"
+        dns:
+          ApiDNSRecord:
+            name: api
+            resource: ApiServerLB
+            resource_type: DNSName
+            type: CNAME
+    elasticache:
+      Elasticache:
+        tags:
+          Role: "Elasticache Instance"
+          Env: "Tag Test"
+        elasticache:
+          auto_minor_version_upgrade: true
+          instance_class: "cache.m1.medium"
+          engine: "memcached"
+          engine_version: "1.4.14"
+          capacity: "1"
+          cache_subnet_group_name: "elasticache-group"
+        dns:
+          ElasticacheDnsRecord:
+            name: elasticache
+            resource: Elasticache
+            resource_type: ConfigurationEndpoint.Address
+            type: CNAME

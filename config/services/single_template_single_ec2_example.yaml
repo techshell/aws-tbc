@@ -1,0 +1,65 @@
+formations:
+  be:
+    description: app infrastructure
+    ec2:
+      bamboo:
+        ami: "ami-xxxxxx"
+        instance_type: "m3.medium"
+        capacity: 1
+        security_groups:
+          prod:
+          - ""
+          preprod:
+          - "s-atlassianrds-xxxxxx"
+        chef:
+         "java": {
+              "install_flavor": "appname",
+              "java_home": "/usr/lib/jvm/java-6-sun"
+         }
+         "ant": {
+            "url": "http://archive.apache.org/dist/ant/binaries/apache-ant-1.9.2-bin.zip",
+            "install_method": "source",
+            "version": "1.9.2",
+            "libraries": {
+              "ant-salesforce": "http://xxxxxx/ant-salesforce.jar",
+              "ant-deploy": "http://xxxxxx/ant-deploy-with-xml-report-task-1.4.jar"
+            },
+            "checksum": "c0714fbc3e62a6fe7cde10782e52752d0772432e9c301cd2aa97438cd3f22d91"
+         }
+         "mysql": {
+           "server_root_password": "xxxxxx",
+            "server_debian_password": "xxxxxx",
+            "server_repl_password": "xxxxxx",
+            "bind_address": "127.0.0.1",
+                  "tunable": {
+                     "wait_timeout": "28800"
+                  }
+          }        
+         "run_list": [
+              "recipe[java::appname]",
+              "recipe[mysql::server]",
+              "recipe[database::mysql]",
+              "recipe[users::bamboo]",
+              "recipe[atlassian::bamboo]",
+              "recipe[apache2::default]",
+              "recipe[apache2::bamboo]"
+         ]
+        tags:
+          environment_tags:
+            prod:
+              Backup: "00 02 * * * * H - 28"
+            preprod:
+              Backup: "00 02 * * * * H - 7"
+          Role: "Bamboo Instance"
+          Env: "Tag Test"
+        block_device_mappings:
+          "sda1":
+            device_name: "/dev/sda1"
+            volume_size: "15"
+            delete_on_termination: true
+        extra_dns: bamboo
+        iam_policies:
+         - s3upload
+         - describestacks
+         - describeec2
+

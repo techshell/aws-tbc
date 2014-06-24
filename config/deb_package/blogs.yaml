@@ -1,0 +1,17 @@
+app:
+  package_source: dir
+  package_type: deb
+  package_name: blogs-telegraph
+  depends:
+  - apache2
+  root_dir: opt/
+  arch: all
+  deb-user: www-data
+  deb-group: www-data
+  after-install:
+  - ln -sf /srv/blogs /opt/wp/blogs/wp-content/blogs.dir
+  - service apache2 start
+  - exit 0
+  before-install:
+  - service apache2 stop
+  - exit 0

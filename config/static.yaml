@@ -1,0 +1,33 @@
+static:
+  preprod:
+    resources:
+      mygluster0:
+        dns:
+          gluster0:
+            name: {'Ref': 'gluster0'}
+            resource: gluster0
+            resource_type: PublicIP
+            type: A
+      mygluster1:
+        dns:
+          gluster1:
+            name: gluster1
+            resource: gluster1
+            resource_type: PublicDNSName
+            type: CNAME
+      mygluster2:
+        dns:
+          gluster2:
+            name: gluster2
+            resource: gluster2
+            resource_type: Static
+            resource_value: 127.0.0.1
+            type: A
+      mygluster3:
+        dns:
+          gluster3:
+            name: gluster3
+            resource: gluster3
+            resource_type: Static
+            resource_value: your.static.dns
+            type: CNAME
