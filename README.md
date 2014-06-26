@@ -1,5 +1,7 @@
 Information about aws-tbc
 
+Puppet introduction
+
 Glossary
  jira
  flavour
