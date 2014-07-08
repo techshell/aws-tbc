@@ -3,18 +3,20 @@
 #
 # See LICENSE file for full license.
 
-from . import AWSObject
-from .validators import integer
+from . import AWSObject, Ref
+from .validators import boolean, integer
 
 
 class CacheCluster(AWSObject):
     type = "AWS::ElastiCache::CacheCluster"
 
     props = {
-        'AutoMinorVersionUpgrade': (bool, False),
+        'AutoMinorVersionUpgrade': (boolean, False),
         'CacheNodeType': (basestring, True),
         'CacheParameterGroupName': (basestring, False),
-        'CacheSecurityGroupNames': (list, False),
+        'CacheSecurityGroupNames': ([basestring, Ref], False),
+        'CacheSubnetGroupName': (basestring, False),
+        'ClusterName': (basestring, False),
         'Engine': (basestring, True),
         'EngineVersion': (basestring, False),
         'NotificationTopicArn': (basestring, False),
@@ -22,8 +24,8 @@ class CacheCluster(AWSObject):
         'Port': (int, False),
         'PreferredAvailabilityZone': (basestring, False),
         'PreferredMaintenanceWindow': (basestring, False),
-        'VpcSecurityGroupIds': (list, False),
-        'CacheSubnetGroupName': (basestring, False),
+        'SnapshotArns': ([basestring, Ref], False),
+        'VpcSecurityGroupIds': ([basestring, Ref], False),
     }
 
 
@@ -36,14 +38,6 @@ class ParameterGroup(AWSObject):
         'Properties': (dict, True),
     }
 
-
-class SubnetGroup(AWSObject):
-    type = "AWS::ElastiCache::SubnetGroup"
-    
-    props = {
-        'Description': (basestring, True),
-        'SubnetIds': (list, True),
-    }
 
 class SecurityGroup(AWSObject):
     type = "AWS::ElastiCache::SecurityGroup"
@@ -60,4 +54,13 @@ class SecurityGroupIngress(AWSObject):
         'CacheSecurityGroupName': (basestring, True),
         'EC2SecurityGroupName': (basestring, True),
         'EC2SecurityGroupOwnerId': (basestring, False),
+    }
+
+
+class SubnetGroup(AWSObject):
+    type = "AWS::ElastiCache::SubnetGroup"
+
+    props = {
+        'Description': (basestring, True),
+        'SubnetIds': (list, True),
     }

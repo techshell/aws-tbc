@@ -3,7 +3,7 @@
 #
 # See LICENSE file for full license.
 
-from . import AWSHelperFn, AWSObject, AWSProperty
+from . import AWSHelperFn, AWSObject, AWSProperty, Ref
 from .validators import integer
 try:
     from awacs.aws import Policy
@@ -29,11 +29,11 @@ class AccessKey(AWSObject):
 
 class PolicyProps():
     props = {
-        'Groups': ([basestring], False),
+        'Groups': ([basestring, Ref], False),
         'PolicyDocument': (policytypes, True),
         'PolicyName': (basestring, True),
-        'Roles': ([basestring], False),
-        'Users': ([basestring], False),
+        'Roles': ([basestring, Ref], False),
+        'Users': ([basestring, Ref], False),
     }
 
 
@@ -88,7 +88,7 @@ class User(AWSObject):
 
     props = {
         'Path': (basestring, False),
-        'Groups': ([Group], False),
+        'Groups': ([basestring, Ref], False),
         'LoginProfile': (LoginProfile, False),
         'Policies': ([Policy], False),
     }

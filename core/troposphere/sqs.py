@@ -3,7 +3,7 @@
 #
 # See LICENSE file for full license.
 
-from . import AWSObject
+from . import AWSObject, AWSProperty
 from .validators import integer
 try:
     from awacs.aws import Policy
@@ -12,10 +12,23 @@ except ImportError:
     policytypes = dict,
 
 
+class RedrivePolicy(AWSProperty):
+    props = {
+        'deadLetterTargetArn': (basestring, False),
+        'maxReceiveCount': (integer, False),
+    }
+
+
 class Queue(AWSObject):
     type = "AWS::SQS::Queue"
 
     props = {
+        'DelaySeconds': (integer, False),
+        'MaximumMessageSize': (integer, False),
+        'MessageRetentionPeriod': (integer, False),
+        'QueueName': (basestring, False),
+        'ReceiveMessageWaitTimeSeconds': (integer, False),
+        'RedrivePolicy': (RedrivePolicy, False),
         'VisibilityTimeout': (integer, False),
     }
 

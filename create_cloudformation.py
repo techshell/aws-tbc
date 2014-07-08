@@ -53,6 +53,6 @@ environment_configuration['KeyName'] = config.get_user_config_value('key_name', 
 if options.timestamp:
     timestamp = options.timestamp
 else:
-    timestamp = config.get_time_stamp(formation_security_group, env)
+    timestamp = config.get_time_stamp(env, formation_security_group)
 
 cloudformation.create_cloudformation_template(environment_configuration, jira, env, flavour, timestamp, berks_file, status)

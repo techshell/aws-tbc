@@ -1,6 +1,4 @@
 defaults:
-  Ami: ami-xxxxxx
-  Snapshot: snap-xxxxxx
   chef:
     run_list:
     - recipe[apt]
@@ -10,18 +8,18 @@ defaults:
     - recipe[users::ops]
     - recipe[postfix]
   seshost:
-    preprod: "postfix"
-    prod: "postfix"
+    wp: "postfix"
   sesuser:
-    preprod: "postfix"
-    prod: "postfix"
+    wp: "postfix"
   sespass:
-    preprod: "postfix"
-    prod: "postfix"
-  environment:
+    wp: "postfix"
+  wp:
+    Region: us-east-1
+    CloudFormationS3Bucket: cw-secure
+    CloudFormationTemplateBucket: cw-cf-templates
     AvailabilityZones:
-    - eu-west-1a
-    - eu-west-1b
+    - us-east-1a
+    - us-east-1b
     HostedZone: preprod.foo.com
     MonitoringSecurityGroup: sg-xxxxxx
     SnsAutoScaling: arn:aws:sns:eu-west-1:xxxxxx:autoscaling-update
@@ -182,47 +180,75 @@ network:
   preprod:
     VpcId: vpc-xxxxxx
     app:
+      subnets:
+      - subnet-xxxxxx
+      - subnet-xxxxxx
+      - subnet-xxxxxx
       SecurityGroupIds: sg-xxxxxx
-      SubnetEuWest1a: subnet-xxxxxx
       SubnetEuWest1aCidr: 10.18.151.0/24
-      SubnetEuWest1b: subnet-xxxxxx
       SubnetEuWest1bCidr: 10.18.152.0/24
-      SubnetEuWest1c: subnet-xxxxxx
       SubnetEuWest1cCidr: 10.18.153.0/24
       VpcId: vpc-xxxxxx
     be:
+      subnets:
+      - subnet-xxxxxx
+      - subnet-xxxxxx
+      - subnet-xxxxxx
       SecurityGroupIds: sg-xxxxxx
       SubnetEuWest1a: subnet-xxxxxx
       SubnetEuWest1aCidr: 10.18.181.0/24
-      SubnetEuWest1b: subnet-ad2c79eb
       SubnetEuWest1bCidr: 10.18.182.0/24
-      SubnetEuWest1c: subnet-6bb6bf09
       SubnetEuWest1cCidr: 10.18.183.0/24
       VpcId: vpc-xxxxxx
     dat:
+      subnets:
+      - subnet-xxxxxx
+      - subnet-xxxxxx
+      - subnet-xxxxxx
       SecurityGroupIds: sg-xxxxxx
-      SubnetEuWest1a: subnet-xxxxxx
       SubnetEuWest1aCidr: 10.18.171.0/24
-      SubnetEuWest1b: subnet-xxxxxx
       SubnetEuWest1bCidr: 10.18.172.0/24
-      SubnetEuWest1c: subnet-xxxxxx
       SubnetEuWest1cCidr: 10.18.173.0/24
       VpcId: vpc-xxxxxx
     db:
+      subnets:
+      - subnet-xxxxxx
+      - subnet-xxxxxx
+      - subnet-xxxxxx
       SecurityGroupIds: sg-xxxxxx
-      SubnetEuWest1a: subnet-xxxxxx
       SubnetEuWest1aCidr: 10.18.191.0/24
-      SubnetEuWest1b: subnet-xxxxxx
       SubnetEuWest1bCidr: 10.18.192.0/24
-      SubnetEuWest1c: subnet-xxxxxx
       SubnetEuWest1cCidr: 10.18.193.0/24
       VpcId: vpc-xxxxxx
     pub:
+      subnets:
+      - subnet-xxxxxx
+      - subnet-xxxxxx
+      - subnet-xxxxxx
       SecurityGroupIds: sg-xxxxxx
-      SubnetEuWest1a: subnet-xxxxxx
       SubnetEuWest1aCidr: 10.18.101.0/24
-      SubnetEuWest1b: subnet-xxxxxx
       SubnetEuWest1bCidr: 10.18.102.0/24
-      SubnetEuWest1c: subnet-xxxxxx
       SubnetEuWest1cCidr: 10.18.103.0/24
       VpcId: vpc-xxxxxx
+vpc:
+  application:
+    cidrblock: 10.0.0.0/16
+    enable_dns_support: true
+    enable_dns_hostnames: true
+    instance_tenancy: default
+    tags:
+      Testing: Tag
+      And: Another
+    network_layers:
+      app:
+        subnets:
+          app-us-east-1c:
+            cidrblock: 10.0.10.0/24
+            az: us-east-1b
+          app-us-east-1d:
+            cidrblock: 10.0.11.0/24
+            az: us-east-1c
+          app-us-east-1e:
+            cidrblock: 10.0.12.0/24
+            az: us-east-1d
+

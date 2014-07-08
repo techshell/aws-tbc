@@ -5,12 +5,13 @@ import config
 
 def s3_connection(env):
     aws_access_key_id, aws_secret_access_key = config.aws_login(env)
+    region = config.get_env_region(env)
 
     if aws_access_key_id:
-        conn = boto.s3.connect_to_region('eu-west-1',aws_access_key_id=aws_access_key_id,
+        conn = boto.s3.connect_to_region(region,aws_access_key_id=aws_access_key_id,
                                       aws_secret_access_key=aws_secret_access_key)
     else:
-        conn = boto.s3.connect_to_region('eu-west-1')
+        conn = boto.s3.connect_to_region(region)
     return conn
 
 

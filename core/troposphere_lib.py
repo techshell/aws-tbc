@@ -59,7 +59,7 @@ def create_tags(instance_object, name_tag, env, propogate_at_launch=False):
     return tag_list
 
 
-def create_instance(t, params, instance_object, instance_name, instance_role, network, timestamp, flavour, jira, ec2_name, az, formation, env, berks_file, resource_security_group=None):
+def create_instance(t, params, instance_object, instance_name, instance_role, subnet, timestamp, flavour, jira, ec2_name, formation, env, berks_file, resource_security_group=None):
     metadata = create_metadata(instance_object["chef"])
     metadata = add_berksfile(metadata, berks_file)
     secgroup_list = [network['SecurityGroupIds'], Ref(params['EnvironmentSecurityGroupId']), Ref(params['MonitoringSecurityGroup'])]
@@ -86,7 +86,7 @@ def create_instance(t, params, instance_object, instance_name, instance_role, ne
                         Metadata=metadata,
                         ImageId=get_ami(instance_object, formation),
                         SecurityGroupIds=secgroup_list,
-                        SubnetId=network['SubnetEuWest1%s' % az],
+                        SubnetId=subnet,
                         UserData=Base64(Ref(params[instance_object["userdata"]])),
                         IamInstanceProfile=Ref(instance_role),
                         InstanceType=instance_object["instance_type"],
@@ -643,3 +643,49 @@ def create_resource_security_group(security_group_name, t, vpcid):
     t.add_resource(security_group_ingress_ping)
     t.add_resource(security_group_ingress)
     return t, security_group
+
+
+def create_vpc(t, vpc_config, vpc_name):
+
+    vpc = ec2.VPC(
+        vpc_name,
+        CidrBlock=vpc_config['cidrblock'],
+        EnableDnsSupport=vpc_config['enable_dns_support'],
+        EnableDnsHostnames=vpc_config['enable_dns_hostnames'],
+        InstanceTenancy=vpc_config['instance_tenancy'],
+    )
+
+    t.add_resource(vpc)
+
+    if 'network_layers' in vpc_config:
+        for layer in vpc_config['network_layers']:
+            for subnet in vpc_config['network_layers'][layer]['subnets']:
+                t = create_ec2_subnet(t, vpc_config['network_layers'][layer]['subnets'][subnet], subnet, vpc)
+
+    tag_list = []
+    #tag_list.append(ec2.Tag("Name", vpc_config))
+    #vpc.Tags = tag_list
+
+    if 'tags' in vpc_config:
+
+        for tag in vpc_config['tags']:
+            tag_list.append(ec2.Tag(tag, vpc_config['tags'][tag]))
+        vpc.Tags = tag_list
+
+    return t
+
+
+def create_ec2_subnet(t, subnet_object, subnet_name, vpc_ref=None):
+
+    subnet = ec2.Subnet(
+        subnet_name.replace("-", ""),
+        CidrBlock=subnet_object['cidrblock'],
+        VpcId=Ref(vpc_ref),
+        Tags=[ec2.Tag("Name", subnet_name)]
+    )
+
+    if 'az' in subnet_object:
+        subnet.AvailabilityZone = subnet_object['az']
+
+    t.add_resource(subnet)
+    return t

@@ -10,7 +10,7 @@ import types
 
 from . import validators
 
-__version__ = "0.3.3"
+__version__ = "0.5.0"
 
 # constants for DeletionPolicy
 Delete = 'Delete'
@@ -21,15 +21,17 @@ valid_names = re.compile(r'^[a-zA-Z0-9]+$')
 
 
 class BaseAWSObject(object):
-    def __init__(self, name, **kwargs):
-        self.name = name
+    def __init__(self, title, template=None, **kwargs):
+        self.title = title
+        self.template = template
         # Cache the keys for validity checks
         self.propnames = self.props.keys()
         self.attributes = ['DependsOn', 'DeletionPolicy',
-                           'Metadata', 'UpdatePolicy']
+                           'Metadata', 'UpdatePolicy',
+                           'Condition']
 
         # unset/None is also legal
-        if name and not valid_names.match(name):
+        if title and not valid_names.match(title):
             raise ValueError('Name not alphanumeric')
 
         # Create the list of properties set on this object by the user
@@ -53,14 +55,24 @@ class BaseAWSObject(object):
             else:
                 self.__setattr__(k, v)
 
+        # Bound it to template if we know it
+        if self.template is not None:
+            self.template.add_resource(self)
+
     def __getattr__(self, name):
         try:
             return self.properties.__getitem__(name)
         except KeyError:
+            # Fall back to the name attribute in the object rather than
+            # in the properties dict. This is for non-OpenStack backwards
+            # compatibility since OpenStack objects use a "name" property.
+            if name == 'name':
+                return self.__getattribute__('title')
             raise AttributeError(name)
 
     def __setattr__(self, name, value):
-        if '_BaseAWSObject__initialized' not in self.__dict__:
+        if name in self.__dict__.keys() \
+                or '_BaseAWSObject__initialized' not in self.__dict__:
             return dict.__setattr__(self, name, value)
         elif name in self.propnames:
             # Check the type of the object and compare against what we were
@@ -100,7 +112,7 @@ class BaseAWSObject(object):
                 self._raise_type(name, value, expected_type)
 
         raise AttributeError("%s object does not support attribute %s" %
-                            (self.type, name))
+                             (self.type, name))
 
     def _raise_type(self, name, value, expected_type):
         raise TypeError('%s is %s, expected %s' %
@@ -134,8 +146,8 @@ class AWSDeclaration(BaseAWSObject):
     aws-product-property-reference.html
     """
 
-    def __init__(self, name, **kwargs):
-        super(AWSDeclaration, self).__init__(name, **kwargs)
+    def __init__(self, title, **kwargs):
+        super(AWSDeclaration, self).__init__(title, **kwargs)
 
 
 class AWSProperty(BaseAWSObject):
@@ -144,9 +156,10 @@ class AWSProperty(BaseAWSObject):
     http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/
     aws-product-property-reference.html
     """
+    dictname = None
 
-    def __init__(self, name=None, **kwargs):
-        super(AWSProperty, self).__init__(name, **kwargs)
+    def __init__(self, title=None, **kwargs):
+        super(AWSProperty, self).__init__(title, **kwargs)
 
 
 def validate_pausetime(pausetime):
@@ -157,8 +170,8 @@ def validate_pausetime(pausetime):
 
 class UpdatePolicy(BaseAWSObject):
     props = {
-        'MaxBatchSize': (basestring, False),
-        'MinInstancesInService': (basestring, False),
+        'MaxBatchSize': (validators.positive_integer, False),
+        'MinInstancesInService': (validators.integer, False),
         'PauseTime': (validate_pausetime, False),
     }
 
@@ -166,18 +179,18 @@ class UpdatePolicy(BaseAWSObject):
         'AutoScalingRollingUpdate',
     )
 
-    def __init__(self, name, **kwargs):
-        if name not in self.valid_update_policies:
+    def __init__(self, title, **kwargs):
+        if title not in self.valid_update_policies:
             raise ValueError('UpdatePolicy name must be one of %r' % (
                 self.valid_update_policies,))
-        self.dictname = name
+        self.dictname = title
         super(UpdatePolicy, self).__init__(None, **kwargs)
 
 
 class AWSHelperFn(object):
     def getdata(self, data):
         if isinstance(data, BaseAWSObject):
-            return data.name
+            return data.title
         else:
             return data
 
@@ -209,6 +222,46 @@ class GetAtt(AWSHelperFn):
 class GetAZs(AWSHelperFn):
     def __init__(self, region):
         self.data = {'Fn::GetAZs': region}
+
+    def JSONrepr(self):
+        return self.data
+
+
+class If(AWSHelperFn):
+    def __init__(self, cond, true, false):
+        self.data = {'Fn::If': [self.getdata(cond), true, false]}
+
+    def JSONrepr(self):
+        return self.data
+
+
+class Equals(AWSHelperFn):
+    def __init__(self, value_one, value_two):
+        self.data = {'Fn::Equals': [value_one, value_two]}
+
+    def JSONrepr(self):
+        return self.data
+
+
+class And(AWSHelperFn):
+    def __init__(self, cond_one, cond_two, *conds):
+        self.data = {'Fn::And': [cond_one, cond_two] + list(conds)}
+
+    def JSONrepr(self):
+        return self.data
+
+
+class Or(AWSHelperFn):
+    def __init__(self, cond_one, cond_two, *conds):
+        self.data = {'Fn::Or': [cond_two, cond_two] + list(conds)}
+
+    def JSONrepr(self):
+        return self.data
+
+
+class Not(AWSHelperFn):
+    def __init__(self, cond):
+        self.data = {'Fn::Not': [self.getdata(cond)]}
 
     def JSONrepr(self):
         return self.data
@@ -246,6 +299,14 @@ class Ref(AWSHelperFn):
         return self.data
 
 
+class Condition(AWSHelperFn):
+    def __init__(self, data):
+        self.data = {'Condition': self.getdata(data)}
+
+    def JSONrepr(self):
+        return self.data
+
+
 class awsencode(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj, 'JSONrepr'):
@@ -256,7 +317,7 @@ class awsencode(json.JSONEncoder):
 class Tags(AWSHelperFn):
     def __init__(self, **kwargs):
         self.tags = []
-        for k, v in kwargs.iteritems():
+        for k, v in sorted(kwargs.iteritems()):
             self.tags.append({
                 'Key': k,
                 'Value': v,
@@ -278,6 +339,7 @@ class Template(object):
 
     def __init__(self):
         self.description = None
+        self.conditions = {}
         self.mappings = {}
         self.outputs = {}
         self.parameters = {}
@@ -287,19 +349,22 @@ class Template(object):
     def add_description(self, description):
         self.description = description
 
+    def add_condition(self, name, condition):
+        self.conditions[name] = condition
+
     def handle_duplicate_key(self, key):
         raise ValueError('duplicate key "%s" detected' % key)
 
     def _update(self, d, values):
         if isinstance(values, list):
             for v in values:
-                if v.name in d:
-                    self.handle_duplicate_key(values.name)
-                d[v.name] = v
+                if v.title in d:
+                    self.handle_duplicate_key(values.title)
+                d[v.title] = v
         else:
-            if values.name in d:
-                self.handle_duplicate_key(values.name)
-            d[values.name] = values
+            if values.title in d:
+                self.handle_duplicate_key(values.title)
+            d[values.title] = values
         return values
 
     def add_output(self, output):
@@ -324,6 +389,8 @@ class Template(object):
         t = {}
         if self.description:
             t['Description'] = self.description
+        if self.conditions:
+            t['Conditions'] = self.conditions
         if self.mappings:
             t['Mappings'] = self.mappings
         if self.outputs:
@@ -334,7 +401,8 @@ class Template(object):
             t['AWSTemplateFormatVersion'] = self.version
         t['Resources'] = self.resources
 
-        return json.dumps(t, cls=awsencode, indent=indent, sort_keys=sort_keys, separators=separators)
+        return json.dumps(t, cls=awsencode, indent=indent,
+                          sort_keys=sort_keys, separators=separators)
 
     def JSONrepr(self):
         return [self.parameters, self.mappings, self.resources]

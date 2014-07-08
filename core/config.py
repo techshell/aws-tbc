@@ -41,8 +41,11 @@ def synchronized(func):
 
 
 @synchronized
-def get_time_stamp(formation_security_group, env):
-    stack = cloudformation.cloudformation_stack_status(formation_security_group, env)
+def get_time_stamp(env, formation_security_group=None):
+    if formation_security_group:
+        stack = cloudformation.cloudformation_stack_status(formation_security_group, env)
+    else:
+        stack = None
     if stack:
         if (stack[0].stack_status == 'CREATE_COMPLETE') or (stack[0].stack_status == 'UPDATE_COMPLETE'):
             print "%s already created" % formation_security_group
@@ -120,7 +123,7 @@ def get_user_config():
     user = pwd.getpwuid(os.getuid())[0]
     home = expanduser("~")
     config = ConfigParser.ConfigParser()
-    config.read("%s/.ssh/environment.cfg" % (home))
+    config.read("%s/.ssh/aws-tbc.cfg" % (home))
     return config
 
 
@@ -226,6 +229,50 @@ def get_environment_configuration(configdir, flavour):
     filedata = f.read()
     config = yaml.safe_load(filedata)
     return config
+
+
+def get_environment_parameter(env, parameter):
+    global_config = get_global_yaml()
+    return global_config['defaults'][env][parameter]
+
+
+def get_cloudformation_secure_bucket(env):
+    global_config = get_global_yaml()
+    return global_config['defaults'][env]['CloudFormationS3Bucket']
+
+
+def get_cloudformation_template_bucket(env):
+    global_config = get_global_yaml()
+    return global_config['defaults'][env]['CloudFormationTemplateBucket']
+
+
+def get_env_region(env):
+    global_config = get_global_yaml()
+    return global_config['defaults'][env]['Region']
+
+
+def set_vpc_id(vpc, network, env, global_config):
+
+    if env in global_config['network']:
+        network['VpcId'] = global_config['network'][env]['VpcId']
+    else:
+        vpc_stack_resource = cloudformation.cloudformation_stack_resource('infra-vpc-' + vpc, vpc, env)
+        vpc_resource_detail = vpc_stack_resource['DescribeStackResourceResponse']['DescribeStackResourceResult']['StackResourceDetail']
+        network['VpcId'] = vpc_resource_detail['PhysicalResourceId']
+    return network
+
+
+def set_subnets(formation, network, env, global_config, vpc):
+
+    if env in global_config['network']:
+        network['subnets'] = global_config['network'][env][formation]['subnets']
+    else:
+        vpc_stack_resource = cloudformation.cloudformation_stack_resources('infra-vpc-' + vpc, env)
+        if vpc_stack_resource:
+            subnets = cloudformation.cloudformation_stack_physical_resource_id(vpc_stack_resource, 'AWS::EC2::Subnet')
+            network['subnets'] = subnets
+    return network
+
 
 
 def get_environment_berks_file(configdir, flavour):

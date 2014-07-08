@@ -4,7 +4,7 @@
 # See LICENSE file for full license.
 
 from . import AWSObject, AWSProperty
-from .validators import integer_range, positive_integer, network_port
+from .validators import boolean, integer_range, positive_integer, network_port
 
 
 class AppCookieStickinessPolicy(AWSProperty):
@@ -16,13 +16,11 @@ class AppCookieStickinessPolicy(AWSProperty):
 
 class HealthCheck(AWSProperty):
     props = {
-        # XXX I don't actually know what the max is on healthy threshold. 20
-        # seems reasonable?
-        'HealthyThreshold': (integer_range(2, 20), True),
+        'HealthyThreshold': (integer_range(2, 10), True),
         'Interval': (positive_integer, True),
         'Target': (basestring, True),
         'Timeout': (positive_integer, True),
-        'UnhealthyThreshold': (positive_integer, True),
+        'UnhealthyThreshold': (integer_range(2, 10), True),
     }
 
 
@@ -54,16 +52,35 @@ class Policy(AWSProperty):
     }
 
 
+class ConnectionDrainingPolicy(AWSProperty):
+    props = {
+        'Enabled': (bool, True),
+        'Timeout': (int, False)
+    }
+
+
+class AccessLoggingPolicy(AWSProperty):
+    props = {
+        'EmitInterval': (int, False),
+        'Enabled': (bool, True),
+        'S3BucketName': (basestring, False),
+        'S3BucketPrefix': (basestring, False),
+    }
+
+
 class LoadBalancer(AWSObject):
     type = "AWS::ElasticLoadBalancing::LoadBalancer"
 
     props = {
+        'AccessLoggingPolicy': (AccessLoggingPolicy, False),
         'AppCookieStickinessPolicy': (list, False),
         'AvailabilityZones': (list, False),
+        'ConnectionDrainingPolicy': (ConnectionDrainingPolicy, False),
+        'CrossZone': (boolean, False),
         'HealthCheck': (HealthCheck, False),
-        'CrossZone': (bool, False),
         'Instances': (list, False),
         'LBCookieStickinessPolicy': (list, False),
+        'LoadBalancerName': (basestring, False),
         'Listeners': (list, True),
         'Policies': (list, False),
         'Scheme': (basestring, False),

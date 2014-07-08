@@ -4,18 +4,20 @@
 # See LICENSE file for full license.
 
 from . import AWSHelperFn, AWSObject, AWSProperty
-from .validators import boolean
+from .validators import boolean, network_port, positive_integer
 
 
 class DBInstance(AWSObject):
     type = "AWS::RDS::DBInstance"
 
     props = {
-        'AllocatedStorage': (basestring, True),
-        'AutoMinorVersionUpgrade': (bool, False),
+        'AllocatedStorage': (positive_integer, True),
+        'AllowMajorVersionUpgrade': (boolean, False),
+        'AutoMinorVersionUpgrade': (boolean, False),
         'AvailabilityZone': (basestring, False),
-        'BackupRetentionPeriod': (basestring, False),
+        'BackupRetentionPeriod': (positive_integer, False),
         'DBInstanceClass': (basestring, True),
+        'DBInstanceIdentifier': (basestring, False),
         'DBName': (basestring, False),
         'DBParameterGroupName': (basestring, False),
         'DBSecurityGroups': (list, False),
@@ -28,9 +30,10 @@ class DBInstance(AWSObject):
         'MasterUsername': (basestring, True),
         'MasterUserPassword': (basestring, True),
         'MultiAZ': (boolean, False),
-        'Port': (basestring, False),
+        'Port': (network_port, False),
         'PreferredBackupWindow': (basestring, False),
         'PreferredMaintenanceWindow': (basestring, False),
+        'SourceDBInstanceIdentifier': (basestring, False),
         'Tags': (list, False),
         'VPCSecurityGroups': ([basestring, AWSHelperFn], False),
     }
@@ -43,6 +46,7 @@ class DBParameterGroup(AWSObject):
         'Description': (basestring, False),
         'Family': (basestring, False),
         'Parameters': (dict, False),
+        'Tags': (list, False),
     }
 
 
@@ -52,6 +56,7 @@ class DBSubnetGroup(AWSObject):
     props = {
         'DBSubnetGroupDescription': (basestring, True),
         'SubnetIds': (list, True),
+        'Tags': (list, False),
     }
 
 
@@ -71,6 +76,7 @@ class DBSecurityGroup(AWSObject):
         'EC2VpcId': (basestring, False),
         'DBSecurityGroupIngress': (list, True),
         'GroupDescription': (basestring, True),
+        'Tags': (list, False),
     }
 
 

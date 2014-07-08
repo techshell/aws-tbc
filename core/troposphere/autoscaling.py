@@ -3,8 +3,8 @@
 #
 # See LICENSE file for full license.
 
-from . import AWSHelperFn, AWSObject, AWSProperty
-from .validators import integer, positive_integer
+from . import AWSHelperFn, AWSObject, AWSProperty, Ref
+from .validators import boolean, integer, positive_integer
 
 
 EC2_INSTANCE_LAUNCH = "autoscaling:EC2_INSTANCE_LAUNCH"
@@ -12,6 +12,13 @@ EC2_INSTANCE_LAUNCH_ERROR = "autoscaling:EC2_INSTANCE_LAUNCH_ERROR"
 EC2_INSTANCE_TERMINATE = "autoscaling:EC2_INSTANCE_TERMINATE"
 EC2_INSTANCE_TERMINATE_ERROR = "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
 TEST_NOTIFICATION = "autoscaling:TEST_NOTIFICATION"
+
+# Termination Policy constants
+Default = 'Default'
+OldestInstance = 'OldestInstance'
+NewestInstance = 'NewestInstance'
+OldestLaunchConfiguration = 'OldestLaunchConfiguration'
+ClosestToNextInstanceHour = 'ClosestToNextInstanceHour'
 
 
 class Tag(AWSHelperFn):
@@ -33,6 +40,13 @@ class NotificationConfiguration(AWSProperty):
     }
 
 
+class MetricsCollection(AWSProperty):
+    props = {
+        'Granularity': (basestring, True),
+        'Metrics': (list, False),
+    }
+
+
 class AutoScalingGroup(AWSObject):
     type = "AWS::AutoScaling::AutoScalingGroup"
 
@@ -42,23 +56,34 @@ class AutoScalingGroup(AWSObject):
         'DesiredCapacity': (integer, False),
         'HealthCheckGracePeriod': (int, False),
         'HealthCheckType': (basestring, False),
+        'InstanceId': (basestring, False),
         'LaunchConfigurationName': (basestring, True),
         'LoadBalancerNames': (list, False),
-        'MaxSize': (positive_integer, True),
+        'MaxSize': (basestring, True),
+        'MetricsCollection': ([MetricsCollection], False),
         'MinSize': (positive_integer, True),
         'NotificationConfiguration': (NotificationConfiguration, False),
         'Tags': (list, False),  # Although docs say these are required
+        'TerminationPolicies': ([basestring], False),
         'VPCZoneIdentifier': (list, False),
     }
 
     def validate(self):
         if 'UpdatePolicy' in self.resource:
             update_policy = self.resource['UpdatePolicy']
-            if int(update_policy.MinInstancesInService) >= int(self.MaxSize):
-                raise ValueError(
-                    "The UpdatePolicy attribute "
-                    "MinInstancesInService must be less than the "
-                    "autoscaling group's MaxSize")
+
+            isMinRef = isinstance(update_policy.MinInstancesInService, Ref)
+            isMaxRef = isinstance(self.MaxSize, Ref)
+
+            if not (isMinRef or isMaxRef):
+                minCount = int(update_policy.MinInstancesInService)
+                maxCount = int(self.MaxSize)
+
+                if minCount >= maxCount:
+                    raise ValueError(
+                        "The UpdatePolicy attribute "
+                        "MinInstancesInService must be less than the "
+                        "autoscaling group's MaxSize")
         return True
 
 
@@ -66,12 +91,13 @@ class LaunchConfiguration(AWSObject):
     type = "AWS::AutoScaling::LaunchConfiguration"
 
     props = {
-        'AssociatePublicIpAddress': (bool, False),
+        'AssociatePublicIpAddress': (boolean, False),
         'BlockDeviceMappings': (list, False),
-        'EbsOptimized': (bool, False),
+        'EbsOptimized': (boolean, False),
         'IamInstanceProfile': (basestring, False),
         'ImageId': (basestring, True),
-        'InstanceMonitoring': (bool, False),
+        'InstanceId': (basestring, False),
+        'InstanceMonitoring': (boolean, False),
         'InstanceType': (basestring, True),
         'KernelId': (basestring, False),
         'KeyName': (basestring, False),
@@ -90,6 +116,20 @@ class ScalingPolicy(AWSObject):
         'AutoScalingGroupName': (basestring, True),
         'Cooldown': (integer, False),
         'ScalingAdjustment': (basestring, True),
+    }
+
+
+class ScheduledAction(AWSObject):
+    type = "AWS::AutoScaling::ScheduledAction"
+
+    props = {
+        'AutoScalingGroupName': (basestring, True),
+        'DesiredCapacity': (integer, False),
+        'EndTime': (basestring, True),
+        'MaxSize': (integer, False),
+        'MinSize': (integer, False),
+        'Recurrence': (basestring, True),
+        'StartTime': (basestring, True),
     }
 
 

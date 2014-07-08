@@ -4,19 +4,28 @@
 # See LICENSE file for full license.
 
 from . import AWSHelperFn, AWSObject, AWSProperty
-from .validators import integer, network_port
+from .validators import boolean, integer, network_port
 
 
 class ForwardedValues(AWSHelperFn):
     def __init__(self, querystring):
-        if not isinstance(querystring, bool):
-            raise TypeError
         self.data = {
-            'QueryString': querystring,
+            'QueryString': boolean(querystring),
         }
 
     def JSONrepr(self):
         return self.data
+
+
+class CacheBehavior(AWSProperty):
+    props = {
+        'TargetOriginId': (basestring, True),
+        'ForwardedValues': (ForwardedValues, True),
+        'TrustedSigners': ([basestring], False),
+        'ViewerProtocolPolicy': (basestring, True),
+        'MinTTL': (integer, False),
+        'PathPattern': (basestring, True),
+    }
 
 
 class DefaultCacheBehavior(AWSProperty):
@@ -68,11 +77,11 @@ class Logging(AWSProperty):
 class DistributionConfig(AWSProperty):
     props = {
         'Aliases': (list, False),
-        'CacheBehaviors': (list, False),
+        'CacheBehaviors': ([CacheBehavior], False),
         'Comment': (basestring, False),
         'DefaultCacheBehavior': (DefaultCacheBehavior, True),
         'DefaultRootObject': (basestring, False),
-        'Enabled': (bool, True),
+        'Enabled': (boolean, True),
         'Logging': (Logging, False),
         'Origins': (list, True),
     }

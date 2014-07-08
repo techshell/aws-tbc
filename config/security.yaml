@@ -1,4 +1,14 @@
 security_groups:
+  wp:
+    base:
+      ssh:
+        cidr:
+        - 195.35.90.111/32
+        config:
+          description: world 22 incoming
+          from_port: '22'
+          protocol: tcp
+          to_port: '22'
   env:
     nat:
       preprod-network:
