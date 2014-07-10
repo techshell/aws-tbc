@@ -48,11 +48,11 @@ else:
 berks_file = config.get_environment_berks_file(configdir, flavour)
 environment_configuration = config.get_environment_configuration(configdir, flavour)
 formation_security_group = ("sg-%s-%s" % (flavour, jira))
-environment_configuration['KeyName'] = config.get_user_config_value('key_name', 'user_config')
+keyname = config.get_user_config_value('key_name', 'user_config')
 
 if options.timestamp:
     timestamp = options.timestamp
 else:
     timestamp = config.get_time_stamp(env, formation_security_group)
 
-cloudformation.create_cloudformation_template(environment_configuration, jira, env, flavour, timestamp, berks_file, status)
+cloudformation.create_cloudformation_template(environment_configuration, jira, env, flavour, timestamp, keyname, berks_file, status)

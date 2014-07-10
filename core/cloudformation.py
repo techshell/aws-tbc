@@ -161,8 +161,9 @@ def create_ec2_instances(cloudformation_parameters, env_name, ec2_group, ec2_nam
     t, instance_role = troposphere_lib.add_instance_profile(t, iam_policies, ec2_group["iam_policies"])
     ec2_group["env"] = env_name
 
-    while range(ec2_group["capacity"]) > len(network['subnets']):
-        network['subnets'] = network['subnets'].extend(network['subnets'])
+    if ec2_group["capacity"] > len(network['subnets']):
+        while ec2_group["capacity"] > len(network['subnets']):
+            network['subnets'].extend(network['subnets'])
 
     for count, subnet in zip( range(ec2_group["capacity"]), network['subnets']):
         # Set unique values for each instance
@@ -193,7 +194,7 @@ def create_ec2_instances(cloudformation_parameters, env_name, ec2_group, ec2_nam
         cloudformation_parameters = config.populate_userdata(instance_configuration[count_resource], "ec2", stack_name,
                                                              cloudformation_parameters, count_resource)
         t = troposphere_lib.create_instance(t, params, instance_configuration[count_resource], count_resource,
-                                            instance_role, subnet, timestamp, flavour, jira, ec2_name, formation, resource_security_group, env, berks_file)
+                                            instance_role, subnet, timestamp, flavour, jira, ec2_name, formation, env, berks_file, network['SecurityGroupIds'], resource_security_group)
         t = troposphere_lib.create_dns_record(t, params, instance_configuration[count_resource])
     return cloudformation_parameters, t
 
@@ -268,12 +269,11 @@ def create_formation_security_group(flavour, jira, timestamp, network, env):
         return stack_resource_detail['PhysicalResourceId']
 
 
-def create_cloudformation_template(environment_configuration, jira, env, flavour, timestamp, berks_file, status=None):
+def create_cloudformation_template(environment_configuration, jira, env, flavour, timestamp, keyname, berks_file, status=None):
     global_config = config.get_global_yaml()
     #Set the ssh key for created instances
     zone = global_config['defaults'][env]['HostedZone']
-    #environment_configuration["network"] = global_config['network'][env]
-    environment_configuration["iam_policies"] = global_config['iam_policies']
+    #environment_configuration["iam_policies"] = global_config['iam_policies']
     secure_bucket = config.get_cloudformation_secure_bucket(env)
     region = config.get_env_region(env)
 
@@ -314,6 +314,7 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
 
         for formation in environment_configuration[vpc]:
             network = config.set_subnets(formation, network, env, global_config, vpc)
+            network['SecurityGroupIds'] = global_config['vpc'][vpc]['security_group_ids']
             # Yaml data as list
             cloudformation_parameters = config.get_yaml_as_list('defaults', env)
             create_stack_arn = [global_config['defaults'][env]['SnsCreateStack']]
@@ -321,7 +322,7 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
             t, params = troposphere_lib.get_template_parameters(t, env)
             stack_name = "%s-%s-%s" % (flavour, jira, formation)
 
-            cloudformation_parameters.append(('KeyName', environment_configuration['KeyName']))
+            cloudformation_parameters.append(('KeyName', keyname))
             t, params = troposphere_lib.add_parameter(t, params, 'KeyName')
 
             cloudformation_parameters.append(('EnvironmentSecurityGroupId', formation_security_group))
@@ -350,15 +351,15 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
                 if item[0] == "AvailabilityZones":
                     az_list = item[1]
 
-            t.add_description(environment_configuration["formations"][formation]["description"])
-            for resource in environment_configuration["formations"][formation]:
+            t.add_description(environment_configuration[vpc][formation]["description"])
+            for resource in environment_configuration[vpc][formation]:
                 if resource == "ec2":
-                    for ec2_instance in environment_configuration["formations"][formation][resource]:
+                    for ec2_instance in environment_configuration[vpc][formation][resource]:
                         name_tag = "%s%s%s%s" % (flavour, ec2_instance, jira, timestamp)
                         name_tag = name_tag.replace("-", "")
-                        ec2_object = environment_configuration["formations"][formation][resource][ec2_instance]
+                        ec2_object = environment_configuration[vpc][formation][resource][ec2_instance]
 
-                        t, resource_security_group = troposphere_lib.create_resource_security_group(name_tag, t, environment_configuration["network"][formation]['VpcId'])
+                        t, resource_security_group = troposphere_lib.create_resource_security_group(name_tag, t, network['VpcId'])
 
                         if "env" in environment_configuration:
                             ec2_object["chef"] = \
@@ -375,16 +376,16 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
                         cloudformation_parameters, t = create_ec2_instances(cloudformation_parameters, jira,
                                                   ec2_object, ec2_instance, params, stack_name, t,
                                                   network,
-                                                  environment_configuration["iam_policies"], timestamp, flavour, jira, formation, env, berks_file, resource_security_group)
+                                                  global_config['iam_policies'], timestamp, flavour, jira, formation, resource_security_group, env, berks_file )
                 elif resource == "autoscaling_groups":
-                    for autoscaling_group in environment_configuration["formations"][formation][resource]:
+                    for autoscaling_group in environment_configuration[vpc][formation][resource]:
                         name_tag = "%s%s%s%s" % (flavour, autoscaling_group, jira, timestamp)
                         name_tag = name_tag.replace("-", "")
-                        autoscaling_object = environment_configuration["formations"][formation][resource][autoscaling_group]
+                        autoscaling_object = environment_configuration[vpc][formation][resource][autoscaling_group]
 
                         t, resource_security_group = troposphere_lib.create_resource_security_group(name_tag, t, environment_configuration["network"][formation]['VpcId'])
 
-                        t, instance_role = troposphere_lib.add_instance_profile(t, environment_configuration["iam_policies"],
+                        t, instance_role = troposphere_lib.add_instance_profile(t, global_config['iam_policies'],
                             autoscaling_object["launchconfig"]["iam_policies"], autoscaling_group)
                         if "env" in environment_configuration:
                             autoscaling_object["launchconfig"]["chef"] = \
@@ -395,7 +396,7 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
                             autoscaling_object["launchconfig"]["chef"] = \
                                 add_chef_env(autoscaling_object["launchconfig"]["chef"], jira, stack_name, zone, env, flavour, None,
                                              autoscaling_object["app_username"])
-                        autoscaling_configuration = environment_configuration["formations"][formation][resource]
+                        autoscaling_configuration = environment_configuration[vpc][formation][resource]
 
                         autoscaling_object["launchconfig"]["userdata"] = autoscaling_group + "UserData"
                         cloudformation_parameters = config.populate_userdata(autoscaling_configuration[autoscaling_group],
@@ -413,8 +414,8 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
                                                             environment_configuration["network"][formation],
                                                             environment_configuration["network"]["pub"], timestamp, flavour, jira, env, berks_file, resource_security_group)
                 elif resource == "rds":
-                    for rds_instance in environment_configuration["formations"][formation][resource]:
-                        rds_object = environment_configuration["formations"][formation][resource][rds_instance]
+                    for rds_instance in environment_configuration[vpc][formation][resource]:
+                        rds_object = environment_configuration[vpc][formation][resource][rds_instance]
                         rds_object["env"] = jira
 
                         suffix = "%s-%s-%s-%s" % (flavour, resource, jira, timestamp)
@@ -429,20 +430,20 @@ def create_cloudformation_template(environment_configuration, jira, env, flavour
                                                             environment_configuration["db_parameters"],
                                                             environment_configuration["network"]["db"], timestamp, flavour, jira, env)
                 elif resource == "elasticache":
-                    for elasticache_instance in environment_configuration["formations"][formation][resource]:
-                        environment_configuration["formations"][formation][resource][elasticache_instance]["env"] = jira
+                    for elasticache_instance in environment_configuration[vpc][formation][resource]:
+                        environment_configuration[vpc][formation][resource][elasticache_instance]["env"] = jira
                         dns_resource = elasticache_instance + "Env"
                         suffix = "%s-%s-%s-%s" % (flavour, 'ec', jira, timestamp)
-                        environment_configuration["formations"][formation][resource][elasticache_instance]["dns"][dns_resource]\
+                        environment_configuration[vpc][formation][resource][elasticache_instance]["dns"][dns_resource]\
                             = config.dns_resource(elasticache_instance , elasticache_instance, "ConfigurationEndpoint.Address", "CNAME", suffix)
                         t = troposphere_lib.create_elasticache(t, params,
-                                                                environment_configuration["formations"][formation][resource][elasticache_instance], elasticache_instance,
+                                                                environment_configuration[vpc][formation][resource][elasticache_instance], elasticache_instance,
                                                             environment_configuration["network"][formation],
                                                             environment_configuration["network"]["app"])
 
         #print t.to_json()
         config.write_template(stack_name, t.to_json())
-        s3url = s3.s3_upload_string(env, 'telegraph-cloudformation-templates', stack_name, t.to_json(), env)
+        s3url = s3.s3_upload_string(env, config.get_cloudformation_template_bucket(env), stack_name, t.to_json(), env)
         tags = {"timestamp": timestamp, "Billing": flavour}
         stack_formation = [stack_name, s3url, env, cloudformation_parameters, create_stack_arn, tags, status]
         stacks.append(stack_formation)
@@ -474,7 +475,7 @@ def create_bucket_policy(env, bucket, bucket_config):
     policy_document = s3.s3_bucket_policy(bucket, bucket_config)
     t = troposphere_lib.s3_bucket_policy(bucket, policy_document)
     stack_name = "infra-bucket-policy-" + bucket
-    s3url = s3.s3_upload_string(env, 'telegraph-cloudformation-templates', stack_name, t.to_json(), env)
+    s3url = s3.s3_upload_string(env, config.get_cloudformation_template_bucket(env), stack_name, t.to_json(), env)
     create_stack(stack_name, s3url, env)
 
 
@@ -492,7 +493,7 @@ def create_static_dns_entries(environment_configuration, env, name):
 
     #build stack and upload to s3.
     stack_name = "infra-static-dns-entries-" + name
-    s3url = s3.s3_upload_string(env, 'telegraph-cloudformation-templates', stack_name, t.to_json(), env)
+    s3url = s3.s3_upload_string(env, config.get_cloudformation_template_bucket(env), stack_name, t.to_json(), env)
 
     #create stack from regional s3 as url.
     create_stack(stack_name, s3url, env)
@@ -596,7 +597,7 @@ def delete_stacks(environment_configuration, env, flavour, jira):
     utils.request_console_confirmation(env)
     #join the threads outside...
     threads = []
-    for formation in environment_configuration["formations"]:
+    for formation in environment_configuration[vpc]:
         stack_name = "%s-%s-%s" % (flavour, jira, formation)
         process_stack = threading.Thread(group=None, name=stack_name, target=delete_stack, args=[stack_name, env])
         threads.append(process_stack)
@@ -615,7 +616,7 @@ def create_stack_formation(stack_name, s3url, env, cloudformation_parameters, cr
     create_stack(stack_name, s3url, env, cloudformation_parameters, create_stack_arn, tags)
     if status != None:
         evaluate_stack_resources_status(stack_name, env)
-    s3.s3_delete_key(env, 'telegraph-cloudformation-templates', stack_name, env)
+    s3.s3_delete_key(env, config.get_cloudformation_template_bucket(env), stack_name, env)
 
 
 def create_stacks(stacks):
@@ -706,7 +707,7 @@ def create_release_log(env, flavour, timestamp, jira, tags):
 
 
 def deploy_debian_package(jira, env, package, target_elbs, flavour, environment_configuration):
-    for formation in environment_configuration["formations"]:
+    for formation in environment_configuration[vpc]:
         stack = "%s-%s-%s" % (flavour, jira, formation)
         stack_ip_list = get_instance_ip_list_from_stack(stack, env, target_elbs)
     for target_elb in target_elbs:

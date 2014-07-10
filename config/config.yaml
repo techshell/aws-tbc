@@ -18,12 +18,13 @@ defaults:
     CloudFormationS3Bucket: cw-secure
     CloudFormationTemplateBucket: cw-cf-templates
     AvailabilityZones:
-    - us-east-1a
     - us-east-1b
-    HostedZone: preprod.foo.com
-    MonitoringSecurityGroup: sg-xxxxxx
-    SnsAutoScaling: arn:aws:sns:eu-west-1:xxxxxx:autoscaling-update
-    SnsCreateStack: arn:aws:sns:eu-west-1:xxxxxx:stack-creation
+    - us-east-1c
+    - us-east-1d
+    HostedZone: api.worldpay.io
+    MonitoringSecurityGroup: sg-31dda854
+    SnsAutoScaling: arn:aws:sns:us-east-1:537625697240:CF-Test
+    SnsCreateStack: arn:aws:sns:us-east-1:537625697240:CF-Test
     chef:
       postfix:
         aliases:
@@ -232,6 +233,8 @@ network:
       VpcId: vpc-xxxxxx
 vpc:
   application:
+    security_group_ids:
+    - sg-ef0e788a
     cidrblock: 10.0.0.0/16
     enable_dns_support: true
     enable_dns_hostnames: true
@@ -239,6 +242,7 @@ vpc:
     tags:
       Testing: Tag
       And: Another
+      Jim: Beam
     network_layers:
       app:
         subnets:
@@ -250,5 +254,28 @@ vpc:
             az: us-east-1c
           app-us-east-1e:
             cidrblock: 10.0.12.0/24
+            az: us-east-1d
+  db:
+    security_group_ids:
+    - sg-ef0e788a
+    cidrblock: 10.1.0.0/16
+    enable_dns_support: true
+    enable_dns_hostnames: true
+    instance_tenancy: default
+    tags:
+      Testing: Tag
+      And: Another
+      Jim: Beam
+    network_layers:
+      app:
+        subnets:
+          db-us-east-1c:
+            cidrblock: 10.1.10.0/24
+            az: us-east-1b
+          db-us-east-1d:
+            cidrblock: 10.1.11.0/24
+            az: us-east-1c
+          db-us-east-1e:
+            cidrblock: 10.1.12.0/24
             az: us-east-1d
 

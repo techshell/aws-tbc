@@ -51,18 +51,22 @@ def create_tags(instance_object, name_tag, env, propogate_at_launch=False):
     else:
         tag_list.append(ec2.Tag("Name", name_tag))
 
-    for env_tag in instance_object["tags"]['environment_tags'][env]:
-        if propogate_at_launch:
-            tag_list.append(autoscaling.Tag(env_tag, instance_object["tags"]['environment_tags'][env][env_tag], propogate="true"))
-        else:
-            tag_list.append(ec2.Tag(env_tag, instance_object["tags"]['environment_tags'][env][env_tag]))
+    if env in instance_object["tags"]['environment_tags']:
+        for env_tag in instance_object["tags"]['environment_tags'][env]:
+            if propogate_at_launch:
+                tag_list.append(autoscaling.Tag(env_tag, instance_object["tags"]['environment_tags'][env][env_tag], propogate="true"))
+            else:
+                tag_list.append(ec2.Tag(env_tag, instance_object["tags"]['environment_tags'][env][env_tag]))
     return tag_list
 
 
-def create_instance(t, params, instance_object, instance_name, instance_role, subnet, timestamp, flavour, jira, ec2_name, formation, env, berks_file, resource_security_group=None):
+def create_instance(t, params, instance_object, instance_name, instance_role, subnet, timestamp, flavour, jira, ec2_name, formation, env, berks_file, security_group_ids, resource_security_group=None):
     metadata = create_metadata(instance_object["chef"])
     metadata = add_berksfile(metadata, berks_file)
-    secgroup_list = [network['SecurityGroupIds'], Ref(params['EnvironmentSecurityGroupId']), Ref(params['MonitoringSecurityGroup'])]
+    secgroup_list = [Ref(params['EnvironmentSecurityGroupId']), Ref(params['MonitoringSecurityGroup'])]
+
+    for security_group_ids in security_group_ids:
+        secgroup_list.append(security_group_ids)
 
     if resource_security_group:
         secgroup_list.append(Ref(resource_security_group))
@@ -80,7 +84,8 @@ def create_instance(t, params, instance_object, instance_name, instance_role, su
 
     name_tag = "%s-%s-%s-%s" % (flavour, ec2_name, jira, timestamp)
 
-    tag_list = create_tags(instance_object, name_tag, env)
+    if 'tags' in instance_object:
+        tag_list = create_tags(instance_object, name_tag, env)
 
     instance = ec2.Instance(instance_name,
                         Metadata=metadata,
@@ -90,8 +95,13 @@ def create_instance(t, params, instance_object, instance_name, instance_role, su
                         UserData=Base64(Ref(params[instance_object["userdata"]])),
                         IamInstanceProfile=Ref(instance_role),
                         InstanceType=instance_object["instance_type"],
-                        Monitoring=1,
                         KeyName=Ref(params['KeyName']), Tags=tag_list)
+
+    if 'monitoring' in instance_object:
+        if instance_object['monitoring']:
+            instance.Monitoring = instance_object['monitoring']
+        else:
+            instance.Monitoring = 0
 
     if "ebs_optimized" in instance_object:
         if instance_object["ebs_optimized"]:
@@ -663,8 +673,8 @@ def create_vpc(t, vpc_config, vpc_name):
                 t = create_ec2_subnet(t, vpc_config['network_layers'][layer]['subnets'][subnet], subnet, vpc)
 
     tag_list = []
-    #tag_list.append(ec2.Tag("Name", vpc_config))
-    #vpc.Tags = tag_list
+    tag_list.append(ec2.Tag("Name", vpc_name))
+    vpc.Tags = tag_list
 
     if 'tags' in vpc_config:
 

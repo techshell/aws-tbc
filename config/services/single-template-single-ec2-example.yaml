@@ -3,9 +3,10 @@ application:
     description: app infrastructure
     ec2:
       bamboo:
-        ami: "ami-xxxxxx"
+        ami: "ami-a3d400d4"
         instance_type: "m3.medium"
         capacity: 1
+        monitoring: 0
         security_groups:
           prod:
           - ""
